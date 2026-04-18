@@ -28,7 +28,10 @@ def save_sales(data):
 # ── Routes ──
 @app.route("/")
 def home():
-    return render_template("index.html")
+    try:
+        return render_template("index.html")
+    except Exception as e:
+        return str(e), 500
 
 @app.route("/api/sales", methods=["GET"])
 def get_sales():
