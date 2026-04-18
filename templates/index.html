@@ -17,7 +17,6 @@
       flex-direction: column;
     }
 
-    /* ── HEADER ── */
     header {
       background: #1A1206;
       padding: 14px 24px;
@@ -56,14 +55,12 @@
       border-radius: 20px;
     }
 
-    /* ── LAYOUT ── */
     .layout {
       display: flex;
       flex: 1;
       overflow: hidden;
     }
 
-    /* ── SIDEBAR ── */
     .sidebar {
       width: 320px;
       background: #FFFCF8;
@@ -86,9 +83,7 @@
       margin-bottom: 12px;
     }
 
-    .form-group {
-      margin-bottom: 10px;
-    }
+    .form-group { margin-bottom: 10px; }
 
     label {
       font-size: 11px;
@@ -113,9 +108,7 @@
       resize: none;
     }
 
-    input:focus, textarea:focus {
-      border-color: #F5A623;
-    }
+    input:focus, textarea:focus { border-color: #F5A623; }
 
     .hint-text {
       font-size: 11px;
@@ -141,11 +134,27 @@
     .btn-add:hover { background: #e6971a; }
     .btn-add:disabled { background: #D4B896; cursor: not-allowed; }
 
-    /* ── SALES LIST ── */
     .sales-list {
       flex: 1;
       overflow-y: auto;
       padding: 12px;
+    }
+
+    /* Search bar */
+    .search-wrap {
+      padding: 10px 12px;
+      border-bottom: 1px solid #E8D8C0;
+    }
+
+    .search-wrap input {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px solid #D4B896;
+      font-size: 13px;
+      background: #FFF8F0;
+      color: #1A1206;
+      outline: none;
     }
 
     .list-header {
@@ -201,7 +210,6 @@
       font-size: 16px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      line-height: 1;
     }
 
     .no-sales {
@@ -211,11 +219,36 @@
       font-size: 13px;
     }
 
-    /* ── MAP ── */
-    #map {
-      flex: 1;
-      cursor: crosshair;
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1A1206;
+      color: #FFF8F0;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: transform 0.3s ease;
+      z-index: 9999;
+      pointer-events: none;
     }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Bouncing pin animation */
+    @keyframes bounce {
+      0%, 100% { transform: rotate(-45deg) translateY(0); }
+      50%       { transform: rotate(-45deg) translateY(-10px); }
+    }
+
+    .pin-bouncing {
+      animation: bounce 0.5s ease infinite;
+    }
+
+    #map { flex: 1; cursor: crosshair; }
   </style>
 </head>
 <body>
@@ -232,24 +265,24 @@
   <div class="sidebar">
     <div class="form-section">
       <h2>Add a Garage Sale</h2>
-
       <div class="form-group">
         <label for="title">Sale Title</label>
         <input type="text" id="title" placeholder="e.g. Big Spring Cleanout">
       </div>
-
       <div class="form-group">
         <label for="date">Date</label>
         <input type="date" id="date">
       </div>
-
       <div class="form-group">
         <label for="description">What's for sale?</label>
         <textarea id="description" rows="2" placeholder="Furniture, tools, clothes..."></textarea>
       </div>
-
       <p class="hint-text" id="map-hint">📍 Click the map to choose a location</p>
       <button class="btn-add" id="btn-add" disabled>Pin to Map</button>
+    </div>
+
+    <div class="search-wrap">
+      <input type="text" id="search" placeholder="🔍 Search sales...">
     </div>
 
     <div class="sales-list">
@@ -263,27 +296,63 @@
   <div id="map"></div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  // ── MAP SETUP ──
-  const map = L.map('map').setView([43.65, -79.38], 13); // default: Toronto
 
+  // ── MAP SETUP ──
+  const map = L.map('map').setView([43.65, -79.38], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  // ── STATE ──
-  let pendingLatLng = null;
-  let sales = JSON.parse(localStorage.getItem('garageSales') || '[]');
-  let markers = {};
+  // Try to jump to user's real location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+    });
+  }
 
-  // ── CUSTOM PIN ICON ──
-  function makeIcon(color = '#F5A623') {
+  // ── STATE ──
+  let pendingLatLng  = null;
+  let pendingMarker  = null;   // the temporary bouncing marker
+  let markers        = {};
+
+  // ── TOAST ──
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  // ── BOUNCING PIN ICON (used while choosing location) ──
+  function makeBouncingIcon() {
+    return L.divIcon({
+      className: '',
+      html: `<div class="pin-bouncing" style="
+        width:32px; height:32px;
+        background:#F5A623;
+        border:3px solid #1A1206;
+        border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);
+        display:flex; align-items:center; justify-content:center;
+        box-shadow:2px 2px 8px rgba(0,0,0,0.3);
+      "><span style="transform:rotate(45deg);font-size:14px;">📍</span></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -36]
+    });
+  }
+
+  // ── CONFIRMED PIN ICON (after location is locked in) ──
+  function makeIcon() {
     return L.divIcon({
       className: '',
       html: `<div style="
         width:32px; height:32px;
-        background:${color};
+        background:#F5A623;
         border:3px solid #1A1206;
         border-radius:50% 50% 50% 0;
         transform:rotate(-45deg);
@@ -296,82 +365,111 @@
     });
   }
 
-  // ── CLICK MAP: choose location ──
+  // ── CLICK MAP ──
   map.on('click', function(e) {
     pendingLatLng = e.latlng;
-    document.getElementById('map-hint').textContent = 
+
+    // Remove old pending marker if exists
+    if (pendingMarker) map.removeLayer(pendingMarker);
+
+    // Drop a BOUNCING marker at clicked location
+    pendingMarker = L.marker([e.latlng.lat, e.latlng.lng], {
+      icon: makeBouncingIcon()
+    }).addTo(map);
+
+    document.getElementById('map-hint').textContent =
       `✅ Location set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
     checkFormReady();
   });
 
-  // ── ENABLE ADD BUTTON when form is ready ──
+  // ── FORM READY CHECK ──
   function checkFormReady() {
     const title = document.getElementById('title').value.trim();
-    const date = document.getElementById('date').value;
+    const date  = document.getElementById('date').value;
     document.getElementById('btn-add').disabled = !(title && date && pendingLatLng);
   }
 
   document.getElementById('title').addEventListener('input', checkFormReady);
   document.getElementById('date').addEventListener('input', checkFormReady);
 
-  // ── ADD A SALE ──
-  document.getElementById('btn-add').addEventListener('click', function() {
+  // ── ADD SALE ──
+  document.getElementById('btn-add').addEventListener('click', async function() {
     const sale = {
-      id: Date.now(),
-      title: document.getElementById('title').value.trim(),
-      date: document.getElementById('date').value,
+      title:       document.getElementById('title').value.trim(),
+      date:        document.getElementById('date').value,
       description: document.getElementById('description').value.trim(),
-      lat: pendingLatLng.lat,
-      lng: pendingLatLng.lng
+      lat:         pendingLatLng.lat,
+      lng:         pendingLatLng.lng
     };
 
-    sales.push(sale);
-    saveSales();
-    addMarker(sale);
-    renderList();
+    const response = await fetch('/api/sales', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(sale)
+    });
 
-    // Reset form
-    document.getElementById('title').value = '';
-    document.getElementById('date').value = '';
-    document.getElementById('description').value = '';
-    document.getElementById('map-hint').textContent = '📍 Click the map to choose a location';
-    pendingLatLng = null;
-    document.getElementById('btn-add').disabled = true;
+    if (response.ok) {
+      // Remove the bouncing preview marker
+      if (pendingMarker) {
+        map.removeLayer(pendingMarker);
+        pendingMarker = null;
+      }
+
+      showToast('📍 Garage sale pinned!');
+      document.getElementById('title').value       = '';
+      document.getElementById('date').value        = '';
+      document.getElementById('description').value = '';
+      document.getElementById('map-hint').textContent = '📍 Click the map to choose a location';
+      pendingLatLng = null;
+      document.getElementById('btn-add').disabled = true;
+      loadSales();
+    }
   });
 
-  // ── ADD MAP MARKER ──
-  function addMarker(sale) {
+  // ── DELETE SALE ──
+  async function deleteSale(id) {
+    if (!confirm('Remove this garage sale?')) return;
+    const response = await fetch(`/api/sales/${id}`, { method: 'DELETE' });
+    if (response.ok) {
+      showToast('🗑️ Sale removed');
+      loadSales();
+    }
+  }
+
+  // ── LOAD ALL SALES ──
+  async function loadSales() {
+    const response = await fetch('/api/sales');
+    const sales    = await response.json();
+    Object.values(markers).forEach(m => map.removeLayer(m));
+    markers = {};
+    sales.forEach(sale => addMarkerToMap(sale));
+    renderList(sales);
+  }
+
+  // ── ADD MARKER TO MAP ──
+  function addMarkerToMap(sale) {
     const marker = L.marker([sale.lat, sale.lng], { icon: makeIcon() }).addTo(map);
     marker.bindPopup(`
       <strong style="font-family:'DM Sans',sans-serif;">${sale.title}</strong><br>
       <span style="font-size:12px;color:#8B6F47;">📅 ${formatDate(sale.date)}</span>
-      ${sale.description ? `<br><span style="font-size:12px;">${sale.description}</span>` : ''}
+      ${sale.description
+        ? `<br><span style="font-size:12px;">${sale.description}</span>`
+        : ''}
     `);
     markers[sale.id] = marker;
   }
 
-  // ── DELETE A SALE ──
-  function deleteSale(id) {
-    sales = sales.filter(s => s.id !== id);
-    if (markers[id]) {
-      map.removeLayer(markers[id]);
-      delete markers[id];
-    }
-    saveSales();
-    renderList();
-  }
-
-  // ── RENDER THE SIDEBAR LIST ──
-  function renderList() {
+  // ── RENDER SIDEBAR LIST ──
+  function renderList(sales) {
     const container = document.getElementById('sales-container');
-    const header = document.getElementById('list-header');
-    const badge = document.getElementById('sale-count-badge');
+    const header    = document.getElementById('list-header');
+    const badge     = document.getElementById('sale-count-badge');
 
     header.textContent = `${sales.length} active listing${sales.length !== 1 ? 's' : ''}`;
-    badge.textContent = `${sales.length} Sale${sales.length !== 1 ? 's' : ''}`;
+    badge.textContent  = `${sales.length} Sale${sales.length !== 1 ? 's' : ''}`;
 
     if (sales.length === 0) {
-      container.innerHTML = '<div class="no-sales">No garage sales yet.<br>Click the map to add one!</div>';
+      container.innerHTML = `<div class="no-sales">No garage sales yet.<br>Click the map to add one!</div>`;
       return;
     }
 
@@ -380,38 +478,62 @@
         <button class="btn-delete" onclick="event.stopPropagation(); deleteSale(${sale.id})">×</button>
         <div class="sale-card-title">${escHtml(sale.title)}</div>
         <div class="sale-card-date">📅 ${formatDate(sale.date)}</div>
-        ${sale.description ? `<div class="sale-card-desc">${escHtml(sale.description)}</div>` : ''}
+        ${sale.description
+          ? `<div class="sale-card-desc">${escHtml(sale.description)}</div>`
+          : ''}
       </div>
     `).join('');
   }
 
-  // ── FOCUS MAP ON A SALE ──
+  // ── FOCUS ON SALE ──
   function focusSale(id) {
-    const sale = sales.find(s => s.id === id);
-    if (sale) {
-      map.setView([sale.lat, sale.lng], 16);
+    if (markers[id]) {
+      map.setView(markers[id].getLatLng(), 16);
       markers[id].openPopup();
     }
   }
 
-  // ── HELPERS ──
-  function saveSales() {
-    localStorage.setItem('garageSales', JSON.stringify(sales));
-  }
+  // ── SEARCH ──
+  document.getElementById('search').addEventListener('input', async function() {
+    const query    = this.value.toLowerCase();
+    const response = await fetch('/api/sales');
+    const sales    = await response.json();
+    const filtered = sales.filter(s =>
+      s.title.toLowerCase().includes(query) ||
+      (s.description && s.description.toLowerCase().includes(query))
+    );
+    renderList(filtered);
+  });
 
+  // ── HELPERS ──
   function formatDate(dateStr) {
     if (!dateStr) return '';
-    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', 
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US',
       { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
-  // ── LOAD SAVED SALES ON START ──
-  sales.forEach(sale => addMarker(sale));
-  renderList();
+  // ── INIT ──
+  loadSales();
+
+  // Jump to user's real location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+      },
+      function(err) {
+        console.log("Location denied or unavailable:", err);
+      }
+    );
+  }
+
 </script>
 </body>
 </html>
