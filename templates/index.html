@@ -15,8 +15,10 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
+    /* ── HEADER ── */
     header {
       background: #1A1206;
       padding: 14px 24px;
@@ -24,6 +26,7 @@
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
+      z-index: 1000;
     }
 
     .logo {
@@ -46,6 +49,12 @@
       font-size: 20px;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     #sale-count-badge {
       background: #F5A623;
       color: #1A1206;
@@ -55,12 +64,28 @@
       border-radius: 20px;
     }
 
+    /* Mobile menu button */
+    .menu-btn {
+      display: none;
+      background: #F5A623;
+      border: none;
+      border-radius: 8px;
+      width: 36px; height: 36px;
+      font-size: 18px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── LAYOUT ── */
     .layout {
       display: flex;
       flex: 1;
       overflow: hidden;
+      position: relative;
     }
 
+    /* ── SIDEBAR ── */
     .sidebar {
       width: 320px;
       background: #FFFCF8;
@@ -69,6 +94,8 @@
       flex-direction: column;
       overflow: hidden;
       flex-shrink: 0;
+      transition: transform 0.3s ease;
+      z-index: 500;
     }
 
     .form-section {
@@ -80,6 +107,12 @@
       font-family: 'Playfair Display', serif;
       font-size: 16px;
       color: #1A1206;
+      margin-bottom: 4px;
+    }
+
+    .form-subtitle {
+      font-size: 12px;
+      color: #8B6F47;
       margin-bottom: 12px;
     }
 
@@ -134,13 +167,7 @@
     .btn-add:hover { background: #e6971a; }
     .btn-add:disabled { background: #D4B896; cursor: not-allowed; }
 
-    .sales-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-    }
-
-    /* Search bar */
+    /* Search */
     .search-wrap {
       padding: 10px 12px;
       border-bottom: 1px solid #E8D8C0;
@@ -155,6 +182,13 @@
       background: #FFF8F0;
       color: #1A1206;
       outline: none;
+    }
+
+    /* Sales list */
+    .sales-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
     }
 
     .list-header {
@@ -219,7 +253,32 @@
       font-size: 13px;
     }
 
-    /* Toast */
+    /* ── MAP ── */
+    #map {
+      flex: 1;
+      cursor: crosshair;
+      z-index: 1;
+    }
+
+    /* ── MOBILE ADD BUTTON (floating) ── */
+    .fab {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px; height: 56px;
+      background: #F5A623;
+      border: 3px solid #1A1206;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    /* ── TOAST ── */
     .toast {
       position: fixed;
       bottom: 24px;
@@ -238,17 +297,66 @@
 
     .toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* Bouncing pin animation */
+    /* ── BOUNCING PIN ── */
     @keyframes bounce {
       0%, 100% { transform: rotate(-45deg) translateY(0); }
       50%       { transform: rotate(-45deg) translateY(-10px); }
     }
 
-    .pin-bouncing {
-      animation: bounce 0.5s ease infinite;
+    .pin-bouncing { animation: bounce 0.5s ease infinite; }
+
+    /* ── HOW IT WORKS BANNER ── */
+    .how-it-works {
+      background: #FFF3E0;
+      border-bottom: 1px solid #E8D8C0;
+      padding: 8px 16px;
+      display: flex;
+      gap: 16px;
+      flex-shrink: 0;
+      overflow-x: auto;
     }
 
-    #map { flex: 1; cursor: crosshair; }
+    .how-step {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      font-size: 12px;
+      color: #5C4A2A;
+    }
+
+    .how-step-num {
+      width: 20px; height: 20px;
+      background: #F5A623;
+      color: #1A1206;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 500;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── MOBILE STYLES ── */
+    @media (max-width: 768px) {
+      .menu-btn { display: flex; }
+
+      .sidebar {
+        position: absolute;
+        top: 0; left: 0;
+        height: 100%;
+        width: 300px;
+        transform: translateX(-100%);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+      }
+
+      .sidebar.open { transform: translateX(0); }
+
+      .fab { display: flex; }
+
+      .how-it-works { display: none; }
+
+      .logo-text { font-size: 16px; }
+    }
   </style>
 </head>
 <body>
@@ -258,13 +366,38 @@
     <div class="logo-icon">🏷️</div>
     <span class="logo-text">Garage Sale Finder</span>
   </div>
-  <span id="sale-count-badge">0 Sales</span>
+  <div class="header-right">
+    <span id="sale-count-badge">0 Sales</span>
+    <button class="menu-btn" id="menu-btn" onclick="toggleSidebar()">☰</button>
+  </div>
 </header>
 
+<!-- How it works banner (desktop only) -->
+<div class="how-it-works">
+  <div class="how-step">
+    <div class="how-step-num">1</div>
+    <span>Click anywhere on the map to drop a pin</span>
+  </div>
+  <div class="how-step">
+    <div class="how-step-num">2</div>
+    <span>Fill in your sale details on the left</span>
+  </div>
+  <div class="how-step">
+    <div class="how-step-num">3</div>
+    <span>Hit "Pin to Map" — anyone can find your sale!</span>
+  </div>
+  <div class="how-step">
+    <div class="how-step-num">4</div>
+    <span>Click any pin on the map to see sale details</span>
+  </div>
+</div>
+
 <div class="layout">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="form-section">
       <h2>Add a Garage Sale</h2>
+      <p class="form-subtitle">Click the map first to choose your location</p>
+
       <div class="form-group">
         <label for="title">Sale Title</label>
         <input type="text" id="title" placeholder="e.g. Big Spring Cleanout">
@@ -296,6 +429,9 @@
   <div id="map"></div>
 </div>
 
+<!-- Mobile floating button -->
+<button class="fab" onclick="toggleSidebar()">🏷️</button>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -307,17 +443,32 @@
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  // Try to jump to user's real location
+  // Jump to user's location
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(pos) {
-      map.setView([pos.coords.latitude, pos.coords.longitude], 13);
-    });
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+      },
+      function(err) { console.log("Location unavailable:", err); }
+    );
   }
 
   // ── STATE ──
-  let pendingLatLng  = null;
-  let pendingMarker  = null;   // the temporary bouncing marker
-  let markers        = {};
+  let pendingLatLng = null;
+  let pendingMarker = null;
+  let markers       = {};
+
+  // ── MOBILE SIDEBAR TOGGLE ──
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  // Close sidebar when clicking map on mobile
+  document.getElementById('map').addEventListener('click', function() {
+    if (window.innerWidth <= 768) {
+      document.getElementById('sidebar').classList.remove('open');
+    }
+  });
 
   // ── TOAST ──
   function showToast(msg) {
@@ -327,7 +478,7 @@
     setTimeout(() => toast.classList.remove('show'), 2500);
   }
 
-  // ── BOUNCING PIN ICON (used while choosing location) ──
+  // ── BOUNCING ICON ──
   function makeBouncingIcon() {
     return L.divIcon({
       className: '',
@@ -346,7 +497,7 @@
     });
   }
 
-  // ── CONFIRMED PIN ICON (after location is locked in) ──
+  // ── CONFIRMED ICON ──
   function makeIcon() {
     return L.divIcon({
       className: '',
@@ -368,18 +519,18 @@
   // ── CLICK MAP ──
   map.on('click', function(e) {
     pendingLatLng = e.latlng;
-
-    // Remove old pending marker if exists
     if (pendingMarker) map.removeLayer(pendingMarker);
-
-    // Drop a BOUNCING marker at clicked location
     pendingMarker = L.marker([e.latlng.lat, e.latlng.lng], {
       icon: makeBouncingIcon()
     }).addTo(map);
-
     document.getElementById('map-hint').textContent =
       `✅ Location set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
     checkFormReady();
+
+    // On mobile, open the sidebar so user can fill the form
+    if (window.innerWidth <= 768) {
+      document.getElementById('sidebar').classList.add('open');
+    }
   });
 
   // ── FORM READY CHECK ──
@@ -409,12 +560,7 @@
     });
 
     if (response.ok) {
-      // Remove the bouncing preview marker
-      if (pendingMarker) {
-        map.removeLayer(pendingMarker);
-        pendingMarker = null;
-      }
-
+      if (pendingMarker) { map.removeLayer(pendingMarker); pendingMarker = null; }
       showToast('📍 Garage sale pinned!');
       document.getElementById('title').value       = '';
       document.getElementById('date').value        = '';
@@ -422,6 +568,9 @@
       document.getElementById('map-hint').textContent = '📍 Click the map to choose a location';
       pendingLatLng = null;
       document.getElementById('btn-add').disabled = true;
+      if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
       loadSales();
     }
   });
@@ -459,7 +608,7 @@
     markers[sale.id] = marker;
   }
 
-  // ── RENDER SIDEBAR LIST ──
+  // ── RENDER LIST ──
   function renderList(sales) {
     const container = document.getElementById('sales-container');
     const header    = document.getElementById('list-header');
@@ -490,6 +639,9 @@
     if (markers[id]) {
       map.setView(markers[id].getLatLng(), 16);
       markers[id].openPopup();
+      if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
     }
   }
 
@@ -521,18 +673,6 @@
 
   // ── INIT ──
   loadSales();
-
-  // Jump to user's real location
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      function(pos) {
-        map.setView([pos.coords.latitude, pos.coords.longitude], 13);
-      },
-      function(err) {
-        console.log("Location denied or unavailable:", err);
-      }
-    );
-  }
 
 </script>
 </body>
