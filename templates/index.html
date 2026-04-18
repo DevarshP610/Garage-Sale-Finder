@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Garage Sale Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #FFF8F0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: #1A1206;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: #F5A623;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+
+    .logo-text {
+      font-family: 'Playfair Display', serif;
+      color: #FFF8F0;
+      font-size: 20px;
+    }
+
+    #sale-count-badge {
+      background: #F5A623;
+      color: #1A1206;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 14px;
+      border-radius: 20px;
+    }
+
+    /* ── LAYOUT ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 320px;
+      background: #FFFCF8;
+      border-right: 1px solid #E8D8C0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .form-section {
+      padding: 16px;
+      border-bottom: 1px solid #E8D8C0;
+    }
+
+    .form-section h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      color: #1A1206;
+      margin-bottom: 12px;
+    }
+
+    .form-group {
+      margin-bottom: 10px;
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #8B6F47;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      background: #FFF8F0;
+      border: 1px solid #D4B896;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: #1A1206;
+      outline: none;
+      resize: none;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #F5A623;
+    }
+
+    .hint-text {
+      font-size: 11px;
+      color: #8B6F47;
+      margin-top: 6px;
+      font-style: italic;
+    }
+
+    .btn-add {
+      width: 100%;
+      padding: 10px;
+      background: #F5A623;
+      color: #1A1206;
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    .btn-add:hover { background: #e6971a; }
+    .btn-add:disabled { background: #D4B896; cursor: not-allowed; }
+
+    /* ── SALES LIST ── */
+    .sales-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .list-header {
+      font-size: 11px;
+      font-weight: 500;
+      color: #8B6F47;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .sale-card {
+      background: #FFF8F0;
+      border: 1px solid #E8D8C0;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      position: relative;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .sale-card:hover { border-color: #F5A623; }
+
+    .sale-card-title {
+      font-weight: 500;
+      font-size: 14px;
+      color: #1A1206;
+      margin-bottom: 3px;
+      padding-right: 24px;
+    }
+
+    .sale-card-date {
+      font-size: 12px;
+      color: #8B6F47;
+      margin-bottom: 4px;
+    }
+
+    .sale-card-desc {
+      font-size: 12px;
+      color: #5C4A2A;
+      line-height: 1.5;
+    }
+
+    .btn-delete {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 22px; height: 22px;
+      background: #FFE8D6;
+      border: none;
+      border-radius: 50%;
+      color: #C0714A;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+
+    .no-sales {
+      text-align: center;
+      padding: 30px 0;
+      color: #8B6F47;
+      font-size: 13px;
+    }
+
+    /* ── MAP ── */
+    #map {
+      flex: 1;
+      cursor: crosshair;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏷️</div>
+    <span class="logo-text">Garage Sale Finder</span>
+  </div>
+  <span id="sale-count-badge">0 Sales</span>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="form-section">
+      <h2>Add a Garage Sale</h2>
+
+      <div class="form-group">
+        <label for="title">Sale Title</label>
+        <input type="text" id="title" placeholder="e.g. Big Spring Cleanout">
+      </div>
+
+      <div class="form-group">
+        <label for="date">Date</label>
+        <input type="date" id="date">
+      </div>
+
+      <div class="form-group">
+        <label for="description">What's for sale?</label>
+        <textarea id="description" rows="2" placeholder="Furniture, tools, clothes..."></textarea>
+      </div>
+
+      <p class="hint-text" id="map-hint">📍 Click the map to choose a location</p>
+      <button class="btn-add" id="btn-add" disabled>Pin to Map</button>
+    </div>
+
+    <div class="sales-list">
+      <div class="list-header" id="list-header">0 active listings</div>
+      <div id="sales-container">
+        <div class="no-sales">No garage sales yet.<br>Click the map to add one!</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ── MAP SETUP ──
+  const map = L.map('map').setView([43.65, -79.38], 13); // default: Toronto
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  // ── STATE ──
+  let pendingLatLng = null;
+  let sales = JSON.parse(localStorage.getItem('garageSales') || '[]');
+  let markers = {};
+
+  // ── CUSTOM PIN ICON ──
+  function makeIcon(color = '#F5A623') {
+    return L.divIcon({
+      className: '',
+      html: `<div style="
+        width:32px; height:32px;
+        background:${color};
+        border:3px solid #1A1206;
+        border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);
+        display:flex; align-items:center; justify-content:center;
+        box-shadow:2px 2px 8px rgba(0,0,0,0.3);
+      "><span style="transform:rotate(45deg);font-size:14px;">🏷️</span></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -36]
+    });
+  }
+
+  // ── CLICK MAP: choose location ──
+  map.on('click', function(e) {
+    pendingLatLng = e.latlng;
+    document.getElementById('map-hint').textContent = 
+      `✅ Location set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    checkFormReady();
+  });
+
+  // ── ENABLE ADD BUTTON when form is ready ──
+  function checkFormReady() {
+    const title = document.getElementById('title').value.trim();
+    const date = document.getElementById('date').value;
+    document.getElementById('btn-add').disabled = !(title && date && pendingLatLng);
+  }
+
+  document.getElementById('title').addEventListener('input', checkFormReady);
+  document.getElementById('date').addEventListener('input', checkFormReady);
+
+  // ── ADD A SALE ──
+  document.getElementById('btn-add').addEventListener('click', function() {
+    const sale = {
+      id: Date.now(),
+      title: document.getElementById('title').value.trim(),
+      date: document.getElementById('date').value,
+      description: document.getElementById('description').value.trim(),
+      lat: pendingLatLng.lat,
+      lng: pendingLatLng.lng
+    };
+
+    sales.push(sale);
+    saveSales();
+    addMarker(sale);
+    renderList();
+
+    // Reset form
+    document.getElementById('title').value = '';
+    document.getElementById('date').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('map-hint').textContent = '📍 Click the map to choose a location';
+    pendingLatLng = null;
+    document.getElementById('btn-add').disabled = true;
+  });
+
+  // ── ADD MAP MARKER ──
+  function addMarker(sale) {
+    const marker = L.marker([sale.lat, sale.lng], { icon: makeIcon() }).addTo(map);
+    marker.bindPopup(`
+      <strong style="font-family:'DM Sans',sans-serif;">${sale.title}</strong><br>
+      <span style="font-size:12px;color:#8B6F47;">📅 ${formatDate(sale.date)}</span>
+      ${sale.description ? `<br><span style="font-size:12px;">${sale.description}</span>` : ''}
+    `);
+    markers[sale.id] = marker;
+  }
+
+  // ── DELETE A SALE ──
+  function deleteSale(id) {
+    sales = sales.filter(s => s.id !== id);
+    if (markers[id]) {
+      map.removeLayer(markers[id]);
+      delete markers[id];
+    }
+    saveSales();
+    renderList();
+  }
+
+  // ── RENDER THE SIDEBAR LIST ──
+  function renderList() {
+    const container = document.getElementById('sales-container');
+    const header = document.getElementById('list-header');
+    const badge = document.getElementById('sale-count-badge');
+
+    header.textContent = `${sales.length} active listing${sales.length !== 1 ? 's' : ''}`;
+    badge.textContent = `${sales.length} Sale${sales.length !== 1 ? 's' : ''}`;
+
+    if (sales.length === 0) {
+      container.innerHTML = '<div class="no-sales">No garage sales yet.<br>Click the map to add one!</div>';
+      return;
+    }
+
+    container.innerHTML = sales.map(sale => `
+      <div class="sale-card" onclick="focusSale(${sale.id})">
+        <button class="btn-delete" onclick="event.stopPropagation(); deleteSale(${sale.id})">×</button>
+        <div class="sale-card-title">${escHtml(sale.title)}</div>
+        <div class="sale-card-date">📅 ${formatDate(sale.date)}</div>
+        ${sale.description ? `<div class="sale-card-desc">${escHtml(sale.description)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── FOCUS MAP ON A SALE ──
+  function focusSale(id) {
+    const sale = sales.find(s => s.id === id);
+    if (sale) {
+      map.setView([sale.lat, sale.lng], 16);
+      markers[id].openPopup();
+    }
+  }
+
+  // ── HELPERS ──
+  function saveSales() {
+    localStorage.setItem('garageSales', JSON.stringify(sales));
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', 
+      { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── LOAD SAVED SALES ON START ──
+  sales.forEach(sale => addMarker(sale));
+  renderList();
+</script>
+</body>
+</html>
