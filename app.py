@@ -8,10 +8,17 @@ DATA_FILE = "data.json"
 
 # ── Helpers first, BEFORE app.run() ──
 def load_sales():
-    if not os.path.exists(DATA_FILE):
+    try:
+        if not os.path.exists(DATA_FILE):
+            save_sales([])
+            return []
+        with open(DATA_FILE, "r") as file:
+            content = file.read().strip()
+            if not content:
+                return []
+            return json.loads(content)
+    except Exception:
         return []
-    with open(DATA_FILE, "r") as file:
-        return json.load(file)
     
 
 def save_sales(data):
