@@ -1,33 +1,49 @@
-# 1. Imports are grouped cleanly at the very top
-from flask import Flask, render_template, jsonify
 import json
+import os
+from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
 
-# 2. Our mock data
-sales_data = [
-    {"id": 1, "title": "Vintage Records", "lat": 43.65, "lng": -79.38}
-]
+DATA_FILE = "data.json"
 
-# 3. All our routes go next
+# ── Helpers first, BEFORE app.run() ──
+def load_sales():
+    if not os.path.exists(DATA_FILE):
+        return []
+    with open(DATA_FILE, "r") as file:
+        return json.load(file)
+    
+
+def save_sales(data):
+    with open(DATA_FILE, "w") as file:
+        json.dump(data, file, indent=2)
+
+# ── Routes ──
 @app.route("/")
 def home():
     return render_template("index.html")
 
 @app.route("/api/sales", methods=["GET"])
 def get_sales():
-    return jsonify(sales_data)
+    return jsonify(load_sales())   # ← reads from file, not fake data
 
-# 4. Turn the key!
-# What exact two lines of code go here to start the server?
+@app.route("/api/sales", methods=["POST"])
+def add_sale():
+    new_sale = request.get_json()
+    sales = load_sales()
+    new_sale["id"] = len(sales) + 1
+    sales.append(new_sale)
+    save_sales(sales)
+    return jsonify(new_sale), 201
 
+@app.route("/api/sales/<int:sale_id>", methods=["DELETE"])
+def delete_sale(sale_id):
+    sales = load_sales()
+    updated = [s for s in sales if s["id"] != sale_id]
+    save_sales(updated)
+    return jsonify({"message": "Deleted!"})
+
+# ── Start the server LAST ──
 if __name__ == "__main__":
-    app.run(debug=True)
-
-def load_sales():
-    with open("sales.json") as file:
-        return json.load(file)
-    
-def save_sales(data):
-    with open("data.json", "w") as file:
-        json.dump(data, file)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
