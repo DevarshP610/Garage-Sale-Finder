@@ -762,8 +762,11 @@
   }
 
   // ── INIT ──
-  loadUser();
-  loadSales();
+  // ── INIT ──
+  window.addEventListener('load', () => {
+    loadUser();
+    loadSales();
+  });
 
 </script>
 </body>
