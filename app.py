@@ -50,7 +50,7 @@ def home():
 
 @app.route("/login")
 def login():
-    redirect_uri = url_for("auth_callback", _external=True)
+    redirect_uri = url_for("auth_callback", _external=True, _scheme="https")
     return google.authorize_redirect(redirect_uri)
 
 @app.route("/auth/callback")
@@ -130,10 +130,6 @@ def delete_sale(sale_id):
 with app.app_context():
     init_db()
 
-@app.route("/login")
-def login():
-    redirect_uri = url_for("auth_callback", _external=True, _scheme="https")
-    return google.authorize_redirect(redirect_uri)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
