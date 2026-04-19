@@ -18,7 +18,6 @@
       overflow: hidden;
     }
 
-    /* ── HEADER ── */
     header {
       background: #1A1206;
       padding: 14px 24px;
@@ -64,7 +63,51 @@
       border-radius: 20px;
     }
 
-    /* Mobile menu button */
+    .btn-login {
+      background: #F5A623;
+      color: #1A1206;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 4px 12px 4px 4px;
+    }
+
+    .user-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .user-name {
+      color: #FFF8F0;
+      font-size: 13px;
+    }
+
+    .btn-logout {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #FFF8F0;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
     .menu-btn {
       display: none;
       background: #F5A623;
@@ -77,7 +120,6 @@
       justify-content: center;
     }
 
-    /* ── LAYOUT ── */
     .layout {
       display: flex;
       flex: 1;
@@ -85,7 +127,6 @@
       position: relative;
     }
 
-    /* ── SIDEBAR ── */
     .sidebar {
       width: 320px;
       background: #FFFCF8;
@@ -167,7 +208,6 @@
     .btn-add:hover { background: #e6971a; }
     .btn-add:disabled { background: #D4B896; cursor: not-allowed; }
 
-    /* Search */
     .search-wrap {
       padding: 10px 12px;
       border-bottom: 1px solid #E8D8C0;
@@ -184,7 +224,6 @@
       outline: none;
     }
 
-    /* Sales list */
     .sales-list {
       flex: 1;
       overflow-y: auto;
@@ -224,7 +263,21 @@
     .sale-card-date {
       font-size: 12px;
       color: #8B6F47;
+      margin-bottom: 2px;
+    }
+
+    .sale-card-user {
+      font-size: 11px;
+      color: #B8956A;
       margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .sale-card-user img {
+      width: 16px; height: 16px;
+      border-radius: 50%;
     }
 
     .sale-card-desc {
@@ -253,59 +306,6 @@
       font-size: 13px;
     }
 
-    /* ── MAP ── */
-    #map {
-      flex: 1;
-      cursor: crosshair;
-      z-index: 1;
-    }
-
-    /* ── MOBILE ADD BUTTON (floating) ── */
-    .fab {
-      display: none;
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 56px; height: 56px;
-      background: #F5A623;
-      border: 3px solid #1A1206;
-      border-radius: 50%;
-      font-size: 24px;
-      cursor: pointer;
-      z-index: 999;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-
-    /* ── TOAST ── */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: #1A1206;
-      color: #FFF8F0;
-      padding: 10px 20px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
-      transition: transform 0.3s ease;
-      z-index: 9999;
-      pointer-events: none;
-    }
-
-    .toast.show { transform: translateX(-50%) translateY(0); }
-
-    /* ── BOUNCING PIN ── */
-    @keyframes bounce {
-      0%, 100% { transform: rotate(-45deg) translateY(0); }
-      50%       { transform: rotate(-45deg) translateY(-10px); }
-    }
-
-    .pin-bouncing { animation: bounce 0.5s ease infinite; }
-
-    /* ── HOW IT WORKS BANNER ── */
     .how-it-works {
       background: #FFF3E0;
       border-bottom: 1px solid #E8D8C0;
@@ -336,10 +336,56 @@
       flex-shrink: 0;
     }
 
-    /* ── MOBILE STYLES ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1A1206;
+      color: #FFF8F0;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: transform 0.3s ease;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    @keyframes bounce {
+      0%, 100% { transform: rotate(-45deg) translateY(0); }
+      50%       { transform: rotate(-45deg) translateY(-10px); }
+    }
+
+    .pin-bouncing { animation: bounce 0.5s ease infinite; }
+
+    .fab {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px; height: 56px;
+      background: #F5A623;
+      border: 3px solid #1A1206;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    #map {
+      flex: 1;
+      cursor: crosshair;
+      z-index: 1;
+    }
+
     @media (max-width: 768px) {
       .menu-btn { display: flex; }
-
       .sidebar {
         position: absolute;
         top: 0; left: 0;
@@ -348,13 +394,9 @@
         transform: translateX(-100%);
         box-shadow: 4px 0 20px rgba(0,0,0,0.15);
       }
-
       .sidebar.open { transform: translateX(0); }
-
       .fab { display: flex; }
-
       .how-it-works { display: none; }
-
       .logo-text { font-size: 16px; }
     }
   </style>
@@ -368,11 +410,11 @@
   </div>
   <div class="header-right">
     <span id="sale-count-badge">0 Sales</span>
-    <button class="menu-btn" id="menu-btn" onclick="toggleSidebar()">☰</button>
+    <div id="auth-area"></div>
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
   </div>
 </header>
 
-<!-- How it works banner (desktop only) -->
 <div class="how-it-works">
   <div class="how-step">
     <div class="how-step-num">1</div>
@@ -388,7 +430,7 @@
   </div>
   <div class="how-step">
     <div class="how-step-num">4</div>
-    <span>Click any pin on the map to see sale details</span>
+    <span>Click any pin on the map to see details</span>
   </div>
 </div>
 
@@ -397,7 +439,6 @@
     <div class="form-section">
       <h2>Add a Garage Sale</h2>
       <p class="form-subtitle">Click the map first to choose your location</p>
-
       <div class="form-group">
         <label for="title">Sale Title</label>
         <input type="text" id="title" placeholder="e.g. Big Spring Cleanout">
@@ -429,9 +470,7 @@
   <div id="map"></div>
 </div>
 
-<!-- Mobile floating button -->
 <button class="fab" onclick="toggleSidebar()">🏷️</button>
-
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -443,27 +482,24 @@
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  // Jump to user's location
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      function(pos) {
-        map.setView([pos.coords.latitude, pos.coords.longitude], 13);
-      },
+      function(pos) { map.setView([pos.coords.latitude, pos.coords.longitude], 13); },
       function(err) { console.log("Location unavailable:", err); }
     );
   }
 
   // ── STATE ──
-  let pendingLatLng = null;
-  let pendingMarker = null;
-  let markers       = {};
+  let pendingLatLng    = null;
+  let pendingMarker    = null;
+  let markers          = {};
+  let currentUserEmail = null;
 
-  // ── MOBILE SIDEBAR TOGGLE ──
+  // ── MOBILE ──
   function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
   }
 
-  // Close sidebar when clicking map on mobile
   document.getElementById('map').addEventListener('click', function() {
     if (window.innerWidth <= 768) {
       document.getElementById('sidebar').classList.remove('open');
@@ -478,7 +514,7 @@
     setTimeout(() => toast.classList.remove('show'), 2500);
   }
 
-  // ── BOUNCING ICON ──
+  // ── ICONS ──
   function makeBouncingIcon() {
     return L.divIcon({
       className: '',
@@ -497,7 +533,6 @@
     });
   }
 
-  // ── CONFIRMED ICON ──
   function makeIcon() {
     return L.divIcon({
       className: '',
@@ -526,14 +561,12 @@
     document.getElementById('map-hint').textContent =
       `✅ Location set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
     checkFormReady();
-
-    // On mobile, open the sidebar so user can fill the form
     if (window.innerWidth <= 768) {
       document.getElementById('sidebar').classList.add('open');
     }
   });
 
-  // ── FORM READY CHECK ──
+  // ── FORM CHECK ──
   function checkFormReady() {
     const title = document.getElementById('title').value.trim();
     const date  = document.getElementById('date').value;
@@ -545,6 +578,12 @@
 
   // ── ADD SALE ──
   document.getElementById('btn-add').addEventListener('click', async function() {
+    if (!currentUserEmail) {
+      showToast('Please sign in to add a sale!');
+      setTimeout(() => window.location.href = '/login', 1500);
+      return;
+    }
+
     const sale = {
       title:       document.getElementById('title').value.trim(),
       date:        document.getElementById('date').value,
@@ -585,7 +624,7 @@
     }
   }
 
-  // ── LOAD ALL SALES ──
+  // ── LOAD SALES ──
   async function loadSales() {
     const response = await fetch('/api/sales');
     const sales    = await response.json();
@@ -595,12 +634,16 @@
     renderList(sales);
   }
 
-  // ── ADD MARKER TO MAP ──
+  // ── ADD MARKER ──
   function addMarkerToMap(sale) {
     const marker = L.marker([sale.lat, sale.lng], { icon: makeIcon() }).addTo(map);
     marker.bindPopup(`
       <strong style="font-family:'DM Sans',sans-serif;">${sale.title}</strong><br>
-      <span style="font-size:12px;color:#8B6F47;">📅 ${formatDate(sale.date)}</span>
+      <span style="font-size:12px;color:#8B6F47;">📅 ${formatDate(sale.date)}</span><br>
+      ${sale.user_picture
+        ? `<img src="${sale.user_picture}" style="width:16px;height:16px;border-radius:50%;vertical-align:middle;margin-right:4px;">`
+        : ''}
+      <span style="font-size:11px;color:#B8956A;">${sale.user_name || ''}</span>
       ${sale.description
         ? `<br><span style="font-size:12px;">${sale.description}</span>`
         : ''}
@@ -624,9 +667,18 @@
 
     container.innerHTML = sales.map(sale => `
       <div class="sale-card" onclick="focusSale(${sale.id})">
-        <button class="btn-delete" onclick="event.stopPropagation(); deleteSale(${sale.id})">×</button>
+        ${sale.user_email === currentUserEmail ? `
+          <button class="btn-delete" onclick="event.stopPropagation(); deleteSale(${sale.id})">×</button>
+        ` : ''}
         <div class="sale-card-title">${escHtml(sale.title)}</div>
         <div class="sale-card-date">📅 ${formatDate(sale.date)}</div>
+        ${sale.user_name ? `
+          <div class="sale-card-user">
+            ${sale.user_picture
+              ? `<img src="${sale.user_picture}" alt="">`
+              : ''}
+            ${escHtml(sale.user_name)}
+          </div>` : ''}
         ${sale.description
           ? `<div class="sale-card-desc">${escHtml(sale.description)}</div>`
           : ''}
@@ -634,7 +686,7 @@
     `).join('');
   }
 
-  // ── FOCUS ON SALE ──
+  // ── FOCUS SALE ──
   function focusSale(id) {
     if (markers[id]) {
       map.setView(markers[id].getLatLng(), 16);
@@ -657,6 +709,44 @@
     renderList(filtered);
   });
 
+  // ── AUTH ──
+  async function loadUser() {
+  try {
+    const res  = await fetch('/api/me');
+    const user = await res.json();
+    const area = document.getElementById('auth-area');
+
+    if (user && user.email) {
+      currentUserEmail = user.email;
+      area.innerHTML = `
+        <div class="user-pill">
+          <img class="user-avatar" src="${user.picture}" alt="${user.name}">
+          <span class="user-name">${user.name.split(' ')[0]}</span>
+          <a href="/logout" class="btn-logout">Sign out</a>
+        </div>`;
+    } else {
+      area.innerHTML = `<a href="/login" class="btn-login">Sign in with Google</a>`;
+    }
+  } catch(e) {
+    console.log("Auth error:", e);
+    document.getElementById('auth-area').innerHTML = 
+      `<a href="/login" class="btn-login">Sign in with Google</a>`;
+  }
+}
+
+    if (user) {
+      currentUserEmail = user.email;
+      area.innerHTML = `
+        <div class="user-pill">
+          <img class="user-avatar" src="${user.picture}" alt="${user.name}">
+          <span class="user-name">${user.name.split(' ')[0]}</span>
+          <a href="/logout" class="btn-logout">Sign out</a>
+        </div>`;
+    } else {
+      area.innerHTML = `<a href="/login" class="btn-login">Sign in with Google</a>`;
+    }
+  
+
   // ── HELPERS ──
   function formatDate(dateStr) {
     if (!dateStr) return '';
@@ -672,6 +762,7 @@
   }
 
   // ── INIT ──
+  loadUser();
   loadSales();
 
 </script>
