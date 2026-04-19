@@ -674,9 +674,7 @@
         <div class="sale-card-date">📅 ${formatDate(sale.date)}</div>
         ${sale.user_name ? `
           <div class="sale-card-user">
-            ${sale.user_picture
-              ? `<img src="${sale.user_picture}" alt="">`
-              : ''}
+            ${sale.user_picture ? `<img src="${sale.user_picture}" alt="">` : ''}
             ${escHtml(sale.user_name)}
           </div>` : ''}
         ${sale.description
@@ -711,41 +709,26 @@
 
   // ── AUTH ──
   async function loadUser() {
-  try {
-    const res  = await fetch('/api/me');
-    const user = await res.json();
-    const area = document.getElementById('auth-area');
-
-    if (user && user.email) {
-      currentUserEmail = user.email;
-      area.innerHTML = `
-        <div class="user-pill">
-          <img class="user-avatar" src="${user.picture}" alt="${user.name}">
-          <span class="user-name">${user.name.split(' ')[0]}</span>
-          <a href="/logout" class="btn-logout">Sign out</a>
-        </div>`;
-    } else {
-      area.innerHTML = `<a href="/login" class="btn-login">Sign in with Google</a>`;
+    try {
+      const res  = await fetch('/api/me');
+      const user = await res.json();
+      const area = document.getElementById('auth-area');
+      if (user && user.email) {
+        currentUserEmail = user.email;
+        area.innerHTML = `
+          <div class="user-pill">
+            <img class="user-avatar" src="${user.picture}" alt="${user.name}">
+            <span class="user-name">${user.name.split(' ')[0]}</span>
+            <a href="/logout" class="btn-logout">Sign out</a>
+          </div>`;
+      } else {
+        area.innerHTML = `<a href="/login" class="btn-login">Sign in with Google</a>`;
+      }
+    } catch(e) {
+      document.getElementById('auth-area').innerHTML =
+        `<a href="/login" class="btn-login">Sign in with Google</a>`;
     }
-  } catch(e) {
-    console.log("Auth error:", e);
-    document.getElementById('auth-area').innerHTML = 
-      `<a href="/login" class="btn-login">Sign in with Google</a>`;
   }
-}
-
-    if (user) {
-      currentUserEmail = user.email;
-      area.innerHTML = `
-        <div class="user-pill">
-          <img class="user-avatar" src="${user.picture}" alt="${user.name}">
-          <span class="user-name">${user.name.split(' ')[0]}</span>
-          <a href="/logout" class="btn-logout">Sign out</a>
-        </div>`;
-    } else {
-      area.innerHTML = `<a href="/login" class="btn-login">Sign in with Google</a>`;
-    }
-  
 
   // ── HELPERS ──
   function formatDate(dateStr) {
@@ -761,7 +744,6 @@
       .replace(/>/g, '&gt;');
   }
 
-  // ── INIT ──
   // ── INIT ──
   window.addEventListener('load', () => {
     loadUser();
