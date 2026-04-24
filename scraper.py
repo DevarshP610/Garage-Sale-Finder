@@ -1,18 +1,35 @@
 import requests
 import json
 import os
+import sys
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from bs4 import BeautifulSoup
 from google import genai
 
+# ── ENVIRONMENT CHECK ──
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if not GEMINI_API_KEY:
+    print("🚨 ERROR: GEMINI_API_KEY environment variable is missing!")
+    sys.exit(1)
+
+if not DATABASE_URL:
+    print("🚨 ERROR: DATABASE_URL environment variable is missing!")
+    sys.exit(1)
+
 # ── GEMINI CLIENT ──
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+try:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+except Exception as e:
+    print(f"🚨 ERROR initializing Gemini Client: {e}")
+    sys.exit(1)
 
 # ── DATABASE ──
 def get_db():
     return psycopg2.connect(
-        os.environ.get("DATABASE_URL"),
+        DATABASE_URL,
         cursor_factory=RealDictCursor
     )
 
@@ -24,8 +41,12 @@ def scrape_kijiji(city="winnipeg"):
     }
 
     print(f"Scraping Kijiji for {city}...")
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+    except Exception as e:
+        print(f"Error fetching Kijiji: {e}")
+        return []
 
     listings = []
     cards = soup.find_all("li", {"class": lambda c: c and "regular-ad" in c})
@@ -54,14 +75,18 @@ def scrape_kijiji(city="winnipeg"):
 
 # ── SCRAPE CRAIGSLIST ──
 def scrape_craigslist(city="winnipeg"):
-    url = "https://winnipeg.craigslist.org/search/gss"
+    url = f"https://{city}.craigslist.org/search/gss"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
-    print("Scraping Craigslist...")
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    print(f"Scraping Craigslist for {city}...")
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+    except Exception as e:
+        print(f"Error fetching Craigslist: {e}")
+        return []
 
     listings = []
     cards = soup.find_all("li", {"class": "cl-static-search-result"})
@@ -74,7 +99,7 @@ def scrape_craigslist(city="winnipeg"):
             listing = {
                 "title":    title.get_text(strip=True) if title else "",
                 "desc":     "",
-                "location": loc.get_text(strip=True)   if loc   else "winnipeg",
+                "location": loc.get_text(strip=True)   if loc   else city,
                 "date":     ""
             }
 
@@ -99,7 +124,7 @@ extract structured data for each one.
 For each listing return a JSON array with objects containing:
 - title: clean title of the sale
 - description: what is being sold
-- date: in YYYY-MM-DD format (if no date found use next Saturday which is 2026-04-26)
+- date: in YYYY-MM-DD format (if no date found use next Saturday which is 2026-04-25)
 - lat: latitude for the location in {city} (estimate based on neighborhood or address)
 - lng: longitude for the location in {city} (estimate based on neighborhood or address)
 - user_name: "Kijiji Listing" or "Craigslist Listing"
@@ -112,18 +137,17 @@ Raw listings:
 {listings_text}"""
 
     print("Sending to Gemini...")
-    response = client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=prompt
-    )
-
     try:
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
+        
         text = response.text.strip()
         text = text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
     except Exception as e:
-        print(f"AI extraction error: {e}")
-        print(f"Raw response: {response.text}")
+        print(f"🚨 AI extraction error: {e}")
         return []
 
 # ── SAVE TO DATABASE ──
@@ -132,8 +156,13 @@ def save_to_db(sales):
         print("No sales to save")
         return
 
-    conn = get_db()
-    cur  = conn.cursor()
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+    except Exception as e:
+        print(f"🚨 Database connection error: {e}")
+        return
+
     saved = 0
 
     for sale in sales:
@@ -153,13 +182,14 @@ def save_to_db(sales):
             ))
             saved += 1
         except Exception as e:
-            print(f"Error saving sale: {e}")
+            print(f"Error saving sale '{sale.get('title', 'Unknown')}': {e}")
+            conn.rollback() # Rollback the failed transaction so others can proceed
             continue
 
     conn.commit()
     cur.close()
     conn.close()
-    print(f"Saved {saved} sales to database!")
+    print(f"✅ Saved {saved} sales to database!")
 
 # ── RUN THE SCRAPER ──
 def run(city="winnipeg"):
