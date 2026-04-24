@@ -115,6 +115,17 @@ def add_sale():
     conn.close()
     return jsonify(new_sale), 201
 
+@app.route("/api/scrape", methods=["POST"])
+def trigger_scrape():
+    # Only you can trigger this
+    secret = request.headers.get("X-Secret")
+    if secret != os.environ.get("SCRAPE_SECRET", "mysecret"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    from scraper import run
+    run("winnipeg")
+    return jsonify({"message": "Scrape complete!"})
+
 @app.route("/api/sales/<int:sale_id>", methods=["DELETE"])
 def delete_sale(sale_id):
     user = session.get("user")
