@@ -139,7 +139,7 @@ Raw listings:
     print("Sending to Gemini...")
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",  # <--- UPDATED MODEL NAME
             contents=prompt
         )
         
@@ -183,7 +183,7 @@ def save_to_db(sales):
             saved += 1
         except Exception as e:
             print(f"Error saving sale '{sale.get('title', 'Unknown')}': {e}")
-            conn.rollback() # Rollback the failed transaction so others can proceed
+            conn.rollback() 
             continue
 
     conn.commit()
