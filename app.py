@@ -125,7 +125,7 @@ def trigger_scrape():
     
     try:
         from scraper import run
-        run("winnipeg")
+        run() # <--- UPDATED: No longer passing "winnipeg" 
         return jsonify({"message": "Scrape complete!"}), 200
     except Exception as e:
         print(f"🚨 SCRAPER CRASHED: {e}", file=sys.stderr)
