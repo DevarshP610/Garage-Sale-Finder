@@ -1,4 +1,5 @@
 import os
+import sys
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
@@ -117,14 +118,18 @@ def add_sale():
 
 @app.route("/api/scrape", methods=["POST"])
 def trigger_scrape():
-    # Only you can trigger this
+    # Check the secret key against your environment variable, defaulting to what you tested with
     secret = request.headers.get("X-Secret")
-    if secret != os.environ.get("SCRAPE_SECRET", "mysecret"):
+    if secret != os.environ.get("SCRAPE_SECRET", "Devarsh@123"):
         return jsonify({"error": "Unauthorized"}), 401
     
-    from scraper import run
-    run("winnipeg")
-    return jsonify({"message": "Scrape complete!"})
+    try:
+        from scraper import run
+        run("winnipeg")
+        return jsonify({"message": "Scrape complete!"}), 200
+    except Exception as e:
+        print(f"🚨 SCRAPER CRASHED: {e}", file=sys.stderr)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/sales/<int:sale_id>", methods=["DELETE"])
 def delete_sale(sale_id):
@@ -145,7 +150,6 @@ def delete_sale(sale_id):
 with app.app_context():
     init_db()
 
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False)
