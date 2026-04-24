@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from bs4 import BeautifulSoup
@@ -13,18 +14,18 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if not GEMINI_API_KEY:
-    print("🚨 ERROR: GEMINI_API_KEY environment variable is missing!")
+    print("🚨 ERROR: GEMINI_API_KEY missing!")
     sys.exit(1)
 
 if not DATABASE_URL:
-    print("🚨 ERROR: DATABASE_URL environment variable is missing!")
+    print("🚨 ERROR: DATABASE_URL missing!")
     sys.exit(1)
 
 # ── GEMINI CLIENT ──
 try:
     client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
-    print(f"🚨 ERROR initializing Gemini Client: {e}")
+    print(f"🚨 ERROR initializing Gemini: {e}")
     sys.exit(1)
 
 # ── DATABASE ──
@@ -36,7 +37,6 @@ def get_db():
 
 # ── GEOCODER (CONVERTS ADDRESS TO GPS) ──
 def geocode_location(address, city):
-    # Fallback center points if the seller didn't provide a real address
     fallbacks = {
         "winnipeg": (49.8951, -97.1384),
         "brandon": (49.8485, -99.9501)
@@ -49,29 +49,31 @@ def geocode_location(address, city):
         return default_lat, default_lng
 
     try:
-        # Using OpenStreetMap's free geocoding API
-        url = f"https://nominatim.openstreetmap.org/search?q={address}, {city}, Manitoba&format=json&limit=1"
-        headers = {"User-Agent": "GarageSaleFinder/1.0"}
+        # FIX: Properly URL-encode the address so the API doesn't break on spaces
+        search_query = f"{address}, {city}, Manitoba"
+        encoded_query = urllib.parse.quote(search_query)
+        url = f"https://nominatim.openstreetmap.org/search?q={encoded_query}&format=json&limit=1"
         
+        headers = {"User-Agent": "GarageSaleFinder/1.0"}
         response = requests.get(url, headers=headers, timeout=5)
         data = response.json()
         
-        # Respect the free API rate limit (1 request per second)
-        time.sleep(1) 
+        time.sleep(1) # Respect API rate limits
         
         if data:
+            print(f"📍 Geocoded '{address}' -> {data[0]['lat']}, {data[0]['lon']}")
             return float(data[0]["lat"]), float(data[0]["lon"])
+        else:
+            print(f"⚠️ Geocoder found nothing for '{search_query}'. Using default.")
     except Exception as e:
-        print(f"Geocoding failed for {address}: {e}")
-        pass
+        print(f"🚨 Geocoding failed for {address}: {e}")
 
     return default_lat, default_lng
 
 # ── SCRAPE KIJIJI ──
 def scrape_kijiji(city):
     url = f"https://www.kijiji.ca/b-garage-sale/{city}/k0l0"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
+    headers = {"User-Agent": "Mozilla/5.0"}
     print(f"Scraping Kijiji for {city}...")
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -100,24 +102,18 @@ def scrape_kijiji(city):
                 listings.append(listing)
         except:
             continue
-
-    print(f"Found {len(listings)} Kijiji listings in {city}")
     return listings
 
 # ── SCRAPE CRAIGSLIST ──
 def scrape_craigslist(city):
-    # Craigslist usually focuses on major hubs, but we try the URL anyway
     url = f"https://{city}.craigslist.org/search/gss"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
+    headers = {"User-Agent": "Mozilla/5.0"}
     print(f"Scraping Craigslist for {city}...")
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            return [] # Skip if the city doesn't have a dedicated CL board
+        if response.status_code != 200: return [] 
         soup = BeautifulSoup(response.text, "html.parser")
     except Exception as e:
-        print(f"Error fetching Craigslist: {e}")
         return []
 
     listings = []
@@ -127,7 +123,6 @@ def scrape_craigslist(city):
         try:
             title = card.find("div", {"class": "title"})
             loc   = card.find("div", {"class": "location"})
-
             listing = {
                 "title":    title.get_text(strip=True) if title else "",
                 "desc":     "",
@@ -138,62 +133,64 @@ def scrape_craigslist(city):
                 listings.append(listing)
         except:
             continue
-
-    print(f"Found {len(listings)} Craigslist listings in {city}")
     return listings
 
 # ── USE GEMINI TO EXTRACT STRUCTURED DATA ──
 def extract_with_ai(listings, city):
-    if not listings:
-        return []
+    if not listings: return []
 
     listings_text = json.dumps(listings, indent=2)
 
-    prompt = f"""You are a data extractor. Given these raw garage sale listings from {city}, Manitoba, extract structured data for each one.
+    prompt = f"""You are a data extractor. Given these raw garage sale listings from {city}, Manitoba:
+1. Extract structured data for each.
+2. For 'street_address', hunt for exact street names, postal codes, or specific intersections. If none, provide the neighborhood name. Leave blank if absolutely no location is mentioned.
 
-For each listing return a JSON array with objects containing:
-- title: clean title of the sale
+Return a JSON array of objects:
+- title: clean title
 - description: what is being sold
-- date: in YYYY-MM-DD format (if no date found use next Saturday which is 2026-04-25)
-- street_address: the specific street address, intersection, or neighborhood mentioned in the description or location. If none exists, leave empty string "".
+- date: YYYY-MM-DD
+- street_address: best guess at specific location
 - user_name: "Kijiji Listing" or "Craigslist Listing"
 - user_email: "scraper@auto.com"
 - user_picture: ""
 
-ONLY return a valid JSON array, no other text, no markdown, no code blocks.
-
-Raw listings:
+ONLY return a valid JSON array.
+Raw:
 {listings_text}"""
 
-    print(f"Sending {city} listings to Gemini...")
+    print(f"Sending {city} to Gemini...")
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
-        
-        text = response.text.strip()
-        text = text.replace("```json", "").replace("```", "").strip()
+        text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
     except Exception as e:
-        print(f"🚨 AI extraction error: {e}")
+        print(f"🚨 AI error: {e}")
         return []
 
 # ── SAVE TO DATABASE ──
 def save_to_db(sales):
-    if not sales:
-        print("No sales to save")
-        return
+    if not sales: return
 
     try:
         conn = get_db()
         cur  = conn.cursor()
     except Exception as e:
-        print(f"🚨 Database connection error: {e}")
+        print(f"🚨 DB connection error: {e}")
         return
 
-    saved = 0
+    # FIX: Delete all old auto-scraped listings before inserting to prevent duplicates!
+    print("🧹 Clearing old scraped listings from database...")
+    try:
+        cur.execute("DELETE FROM sales WHERE user_email = 'scraper@auto.com'")
+        conn.commit()
+    except Exception as e:
+        print(f"🚨 Error clearing old data: {e}")
+        conn.rollback()
 
+    saved = 0
     for sale in sales:
         try:
             cur.execute("""
@@ -211,44 +208,30 @@ def save_to_db(sales):
             ))
             saved += 1
         except Exception as e:
-            print(f"Error saving sale '{sale.get('title', 'Unknown')}': {e}")
             conn.rollback() 
             continue
 
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Saved {saved} total sales to database!")
+    print(f"✅ Saved {saved} new, unique sales to database!")
 
 # ── RUN THE SCRAPER ──
 def run():
-    print("Starting scraper for Manitoba...")
-    
-    # Loop through major Manitoba cities
     cities = ["winnipeg", "brandon"]
-    all_structured_sales = []
+    all_structured = []
 
     for city in cities:
-        kijiji_listings = scrape_kijiji(city)
-        craigslist_listings = scrape_craigslist(city)
-
-        city_listings = kijiji_listings + craigslist_listings
-        print(f"Total raw listings for {city}: {len(city_listings)}")
-
+        city_listings = scrape_kijiji(city) + scrape_craigslist(city)
         if city_listings:
             structured = extract_with_ai(city_listings, city.capitalize())
-            
-            # Convert addresses to exact lat/lng GPS coordinates
-            print(f"Geocoding exact coordinates for {city}...")
             for sale in structured:
                 address = sale.get("street_address", "")
                 lat, lng = geocode_location(address, city)
-                sale["lat"] = lat
-                sale["lng"] = lng
-                
-            all_structured_sales.extend(structured)
+                sale["lat"], sale["lng"] = lat, lng
+            all_structured.extend(structured)
 
-    save_to_db(all_structured_sales)
+    save_to_db(all_structured)
     print("Done!")
 
 if __name__ == "__main__":
