@@ -77,8 +77,12 @@ def me():
 def get_sales():
     conn = get_db()
     cur  = conn.cursor()
+    # Only return sales where the date is today or in the future
+    # Also delete expired ones automatically
+    cur.execute("DELETE FROM sales WHERE date < CURRENT_DATE::text")
     cur.execute("SELECT * FROM sales ORDER BY id DESC")
     sales = cur.fetchall()
+    conn.commit()
     cur.close()
     conn.close()
     return jsonify([dict(s) for s in sales])
