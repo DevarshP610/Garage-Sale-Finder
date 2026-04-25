@@ -26,18 +26,12 @@ except Exception as e:
 def get_db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-# ── EXACT GEOCODER ──
+# ── RUTHLESS EXACT GEOCODER ──
 def geocode_location(address, city):
-    fallbacks = {
-        "winnipeg": (49.8951, -97.1384),
-        "brandon": (49.8485, -99.9501)
-    }
-    city_lower = city.lower()
-    base_lat, base_lng = fallbacks.get(city_lower, (49.8951, -97.1384))
-
+    # NO MORE FALLBACKS. If we don't have an address, we return None.
     if not address or address.lower() in ["none", "n/a", "unknown", "", "tbd"]:
-        print("⚠️ No address clues found in listing. Using city center.")
-        return base_lat, base_lng
+        print("🗑️ No address clues found in text. Trashing listing.")
+        return None, None
 
     try:
         search_query = f"{address}, {city}, Manitoba"
@@ -50,14 +44,16 @@ def geocode_location(address, city):
         time.sleep(1) # Respect rate limits
         
         if data:
-            print(f"📍 GPS Found for AI-extracted address: '{address}'")
-            return float(data[0]["lat"]), float(data[0]["lon"])
+            lat = float(data[0]["lat"])
+            lng = float(data[0]["lon"])
+            print(f"📍 Precision Lock: '{address}' -> {lat}, {lng}")
+            return lat, lng
         else:
-            print(f"⚠️ API couldn't map '{address}'. Using city center.")
-            return base_lat, base_lng
+            print(f"🗑️ API rejected '{address}'. Trashing listing.")
+            return None, None
     except Exception as e:
-        print(f"🚨 Geocoding failed: {e}")
-        return base_lat, base_lng
+        print(f"🚨 Geocoding error for '{address}': {e}")
+        return None, None
 
 # ── SCRAPE KIJIJI ──
 def scrape_kijiji(city):
@@ -122,7 +118,7 @@ Scan the entire listing for location clues. You MUST format the 'street_address'
 - If it mentions an intersection, use an ampersand (e.g., "Osborne St & River Ave").
 - If it has a postal code, return just the postal code (e.g., "R3B 2A1").
 - STRIP OUT garbage words like "near", "corner of", "beside", "behind", "in back of".
-- DO NOT include the city name or "Manitoba" (I add that later).
+- DO NOT include the city name or "Manitoba".
 - If there is absolutely zero location data in the text, return "".
 
 Return a JSON array of objects:
@@ -167,8 +163,8 @@ def save_to_db(sales):
                 sale.get("title", "Garage Sale")[:250],
                 sale_date,
                 sale.get("description", ""),
-                float(sale.get("lat", 49.8951)),
-                float(sale.get("lng", -97.1384)),
+                float(sale["lat"]),
+                float(sale["lng"]),
                 "scraper@auto.com",
                 "Auto Listed",
                 ""
@@ -182,23 +178,28 @@ def save_to_db(sales):
 
     cur.close()
     conn.close()
-    print(f"✅ Saved {saved} sales to database!")
+    print(f"✅ Saved {saved} elite sales to database!")
 
 # ── RUN ──
 def run():
     cities = ["winnipeg", "brandon"]
-    all_structured = []
+    valid_sales = []
 
     for city in cities:
         raw = scrape_kijiji(city) + scrape_craigslist(city)
         if raw:
             structured = extract_with_ai(raw, city.capitalize())
             for sale in structured:
+                # Get the strict coordinates
                 lat, lng = geocode_location(sale.get("street_address", ""), city)
-                sale["lat"], sale["lng"] = lat, lng
-            all_structured.extend(structured)
+                
+                # ONLY keep the sale if the coordinates are successfully found
+                if lat is not None and lng is not None:
+                    sale["lat"] = lat
+                    sale["lng"] = lng
+                    valid_sales.append(sale)
 
-    save_to_db(all_structured)
+    save_to_db(valid_sales)
     print("Done!")
 
 if __name__ == "__main__":
