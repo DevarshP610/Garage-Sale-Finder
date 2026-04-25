@@ -33,7 +33,6 @@ def geocode_location(address, city):
         return None, None
 
     try:
-        # Removed "Manitoba" so it dynamically searches the globe
         search_query = f"{address}, {city}"
         encoded_query = urllib.parse.quote(search_query)
         url = f"https://nominatim.openstreetmap.org/search?q={encoded_query}&format=json&limit=1"
@@ -41,7 +40,7 @@ def geocode_location(address, city):
         headers = {"User-Agent": "GarageSaleFinderGlobal/1.0"}
         response = requests.get(url, headers=headers, timeout=5)
         data = response.json()
-        time.sleep(1) # Respect global API rate limits (CRITICAL)
+        time.sleep(1) 
         
         if data:
             lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
@@ -65,7 +64,7 @@ def scrape_kijiji(city):
 
     listings = []
     cards = soup.find_all("li", {"class": lambda c: c and "regular-ad" in c})
-    for card in cards[:15]: # Bumped up limits
+    for card in cards[:15]:
         try:
             title = card.find("div", {"class": lambda c: c and "title" in c})
             desc  = card.find("div", {"class": lambda c: c and "description" in c})
@@ -89,7 +88,7 @@ def scrape_craigslist(city):
 
     listings = []
     cards = soup.find_all("li", {"class": "cl-static-search-result"})
-    for card in cards[:15]: # Bumped up limits
+    for card in cards[:15]:
         try:
             title = card.find("div", {"class": "title"})
             listing = {
@@ -111,27 +110,29 @@ Extract ONLY the number and street name, OR intersection, OR postal/zip code.
 STRIP OUT all garbage words. DO NOT include the city name, state, or province.
 If absolutely no precise location data is in the text, return "".
 
-Return a JSON array of objects:
+Return a JSON array of objects with these exact keys:
 - title: string
 - description: string
 - date: MUST be YYYY-MM-DD. If missing, use "2026-04-25"
-- street_address: highly clean string for geocoding
-ONLY return a valid JSON array."""
+- street_address: highly clean string for geocoding"""
     
     try:
+        # 🔥 THE FIX: Force JSON mime type so Gemini CANNOT format it incorrectly
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt + "\nRaw Data:\n" + json.dumps(listings)
+            contents=prompt + "\nRaw Data:\n" + json.dumps(listings),
+            config={"response_mime_type": "application/json"}
         )
-        text = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(text)
+        return json.loads(response.text)
     except Exception as e:
-        print(f"🚨 AI error: {e}")
+        print(f"🚨 AI error in {city}: {e}")
         return []
 
 # ── SAVE TO DATABASE ──
 def save_to_db(sales):
-    if not sales: return
+    if not sales: 
+        print("⚠️ No valid mapped sales to save this run.")
+        return
     conn = get_db()
     cur  = conn.cursor()
 
@@ -172,7 +173,6 @@ def save_to_db(sales):
 # ── BACKGROUND WORKER ──
 def run_scraper_background():
     print("🚀 GLOBAL SCRAPE INITIATED in background...")
-    # Massive hub list
     cities = [
         "winnipeg", "brandon", "toronto", "vancouver", "calgary", "ottawa", "halifax",
         "newyork", "losangeles", "chicago", "houston", "miami", "seattle", "austin"
@@ -196,10 +196,9 @@ def run_scraper_background():
 
 # ── TRIGGER FUNCTION ──
 def run():
-    # This spawns a separate thread so Railway doesn't time out the API request
     thread = threading.Thread(target=run_scraper_background)
     thread.start()
     return "Scraper started in the background! Check Railway logs for progress."
 
 if __name__ == "__main__":
-    run_scraper_background() # Runs directly if testing locally
+    run_scraper_background()
