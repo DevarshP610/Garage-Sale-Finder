@@ -10,6 +10,14 @@ from psycopg2.extras import RealDictCursor
 from bs4 import BeautifulSoup
 from google import genai
 
+
+#SCRAPER WONT WORK, CANT FIND THE EXACT LOCATION
+#SOMEONE FIX PLZ
+
+
+
+
+
 # ── ENVIRONMENT CHECK ──
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -202,3 +210,4 @@ def run():
 
 if __name__ == "__main__":
     run_scraper_background()
+ 
