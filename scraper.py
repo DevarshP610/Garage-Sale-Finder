@@ -26,37 +26,38 @@ except Exception as e:
 def get_db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-# ── GEOCODER ──
+# ── EXACT GEOCODER ──
 def geocode_location(address, city):
     fallbacks = {
         "winnipeg": (49.8951, -97.1384),
         "brandon": (49.8485, -99.9501)
     }
     city_lower = city.lower()
-    default_lat, default_lng = fallbacks.get(city_lower, (49.8951, -97.1384))
+    base_lat, base_lng = fallbacks.get(city_lower, (49.8951, -97.1384))
 
-    if not address or address.lower() in ["none", "n/a", "unknown", ""]:
-        return default_lat, default_lng
+    if not address or address.lower() in ["none", "n/a", "unknown", "", "tbd"]:
+        print("⚠️ No address clues found in listing. Using city center.")
+        return base_lat, base_lng
 
     try:
         search_query = f"{address}, {city}, Manitoba"
         encoded_query = urllib.parse.quote(search_query)
         url = f"https://nominatim.openstreetmap.org/search?q={encoded_query}&format=json&limit=1"
         
-        headers = {"User-Agent": "GarageSaleFinder/1.0"}
+        headers = {"User-Agent": "GarageSaleFinderElite/1.0"}
         response = requests.get(url, headers=headers, timeout=5)
         data = response.json()
-        time.sleep(1) 
+        time.sleep(1) # Respect rate limits
         
         if data:
-            print(f"📍 Found GPS for '{address}'")
+            print(f"📍 GPS Found for AI-extracted address: '{address}'")
             return float(data[0]["lat"]), float(data[0]["lon"])
         else:
-            print(f"⚠️ No exact GPS for '{address}'. Using city center.")
+            print(f"⚠️ API couldn't map '{address}'. Using city center.")
+            return base_lat, base_lng
     except Exception as e:
         print(f"🚨 Geocoding failed: {e}")
-
-    return default_lat, default_lng
+        return base_lat, base_lng
 
 # ── SCRAPE KIJIJI ──
 def scrape_kijiji(city):
@@ -74,9 +75,11 @@ def scrape_kijiji(city):
         try:
             title = card.find("div", {"class": lambda c: c and "title" in c})
             desc  = card.find("div", {"class": lambda c: c and "description" in c})
+            loc   = card.find("div", {"class": lambda c: c and "location" in c})
             listing = {
                 "title": title.get_text(strip=True) if title else "",
-                "desc": desc.get_text(strip=True) if desc else ""
+                "desc": desc.get_text(strip=True) if desc else "",
+                "loc": loc.get_text(strip=True) if loc else ""
             }
             if listing["title"]: listings.append(listing)
         except: continue
@@ -100,28 +103,39 @@ def scrape_craigslist(city):
             title = card.find("div", {"class": "title"})
             listing = {
                 "title": title.get_text(strip=True) if title else "",
-                "desc": ""
+                "desc": "",
+                "loc": ""
             }
             if listing["title"]: listings.append(listing)
         except: continue
     return listings
 
-# ── USE GEMINI TO EXTRACT ──
+# ── USE GEMINI TO EXTRACT & FORMAT ──
 def extract_with_ai(listings, city):
     if not listings: return []
-    prompt = f"""You are a data extractor for {city}, Manitoba.
-Extract structured data. For 'street_address', find the exact street or intersection. 
-Return JSON array of objects:
+    prompt = f"""You are an elite data extraction and location parsing AI for {city}, Manitoba.
+Analyze the raw listings (title, description, loc) and extract structured data.
+
+🔥 CRITICAL INSTRUCTION FOR 'street_address': 🔥
+Scan the entire listing for location clues. You MUST format the 'street_address' so an OpenStreetMap geocoder can read it flawlessly.
+- If it's a normal address, return ONLY the number and street name (e.g., "456 Portage Ave").
+- If it mentions an intersection, use an ampersand (e.g., "Osborne St & River Ave").
+- If it has a postal code, return just the postal code (e.g., "R3B 2A1").
+- STRIP OUT garbage words like "near", "corner of", "beside", "behind", "in back of".
+- DO NOT include the city name or "Manitoba" (I add that later).
+- If there is absolutely zero location data in the text, return "".
+
+Return a JSON array of objects:
 - title: string
 - description: string
 - date: MUST be YYYY-MM-DD. If missing, use "2026-04-25"
-- street_address: string
-ONLY return valid JSON array."""
+- street_address: optimized string for geocoding
+ONLY return a valid JSON array."""
     
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt + "\n" + json.dumps(listings)
+            contents=prompt + "\nRaw Data:\n" + json.dumps(listings)
         )
         text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
@@ -142,7 +156,6 @@ def save_to_db(sales):
     saved = 0
     for sale in sales:
         try:
-            # 🛡️ BULLETPROOF FIX 1: Force a valid future date so app.py doesn't auto-delete it!
             sale_date = sale.get("date", "")
             if not sale_date or not sale_date.startswith("202"):
                 sale_date = "2026-04-25"
@@ -160,7 +173,6 @@ def save_to_db(sales):
                 "Auto Listed",
                 ""
             ))
-            # 🛡️ BULLETPROOF FIX 2: Commit EACH sale individually!
             conn.commit()
             saved += 1
         except Exception as e:
@@ -170,7 +182,7 @@ def save_to_db(sales):
 
     cur.close()
     conn.close()
-    print(f"✅ Saved {saved} permanent sales to database!")
+    print(f"✅ Saved {saved} sales to database!")
 
 # ── RUN ──
 def run():
