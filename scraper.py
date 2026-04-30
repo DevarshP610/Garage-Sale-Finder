@@ -110,14 +110,17 @@ def scrape_kijiji(city):
                 except:
                     pass
             
-            if title and ("garage" in title.lower() or "yard" in title.lower() or "moving" in title.lower() or "estate" in title.lower()):
+            title_lower = title.lower() if title else ""
+            desc_lower = desc.lower() if desc else ""
+            if any(kw in title_lower for kw in ["garage", "yard", "moving", "estate", "sale"]) or \
+               any(kw in desc_lower for kw in ["garage", "yard", "moving", "estate", "sale"]):
                 listings.append({"title": title, "desc": desc})
         except: continue
     return listings
 
 # ── SCRAPE CRAIGSLIST (GLOBAL) USING RSS FOR FULL TEXT ──
 def scrape_craigslist(city):
-    url = f"https://{city}.craigslist.org/search/gss?format=rss"
+    url = f"https://{city}.craigslist.org/search/gms?format=rss"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -134,7 +137,10 @@ def scrape_craigslist(city):
             title = item.title.get_text(strip=True) if item.title else ""
             desc = item.description.get_text(" ", strip=True) if item.description else ""
             
-            if title and ("garage" in title.lower() or "yard" in title.lower() or "moving" in title.lower() or "estate" in title.lower()):
+            title_lower = title.lower() if title else ""
+            desc_lower = desc.lower() if desc else ""
+            if any(kw in title_lower for kw in ["garage", "yard", "moving", "estate", "sale"]) or \
+               any(kw in desc_lower for kw in ["garage", "yard", "moving", "estate", "sale"]):
                 listings.append({
                     "title": title,
                     "desc": desc
@@ -169,7 +175,17 @@ Return a JSON array of objects with these exact keys:
             contents=prompt + "\nRaw Data:\n" + json.dumps(listings),
             config={"response_mime_type": "application/json"}
         )
-        return json.loads(response.text or "[]")
+        
+        raw_text = (response.text or "[]").strip()
+        # Strip Markdown formatting if the AI sneaks it in
+        if raw_text.startswith("```json"):
+            raw_text = raw_text[7:]
+        elif raw_text.startswith("```"):
+            raw_text = raw_text[3:]
+        if raw_text.endswith("```"):
+            raw_text = raw_text[:-3]
+            
+        return json.loads(raw_text.strip())
     except Exception as e:
         print(f"🚨 AI error in {city}: {e}")
         return []
