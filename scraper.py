@@ -10,14 +10,6 @@ from psycopg2.extras import RealDictCursor
 from bs4 import BeautifulSoup
 from google import genai
 
-
-#SCRAPER WONT WORK, CANT FIND THE EXACT LOCATION
-#SOMEONE FIX PLZ
-
-
-
-
-
 # ── ENVIRONMENT CHECK ──
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -36,74 +28,117 @@ def get_db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # ── GLOBAL EXACT GEOCODER ──
-def geocode_location(address, city):
-    if not address or address.lower() in ["none", "n/a", "unknown", "", "tbd"]:
-        return None, None
-
-    try:
-        search_query = f"{address}, {city}"
-        encoded_query = urllib.parse.quote(search_query)
-        url = f"https://nominatim.openstreetmap.org/search?q={encoded_query}&format=json&limit=1"
-        
-        headers = {"User-Agent": "GarageSaleFinderGlobal/1.0"}
-        response = requests.get(url, headers=headers, timeout=5)
-        data = response.json()
-        time.sleep(1) 
-        
-        if data:
-            lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
-            print(f"📍 Mapped: '{address}, {city}' -> {lat}, {lng}")
-            return lat, lng
-        else:
-            print(f"🗑️ Geocoder rejected '{address}'. Trashing.")
-            return None, None
-    except Exception as e:
-        print(f"🚨 Geocoding error: {e}")
-        return None, None
+def geocode_location(address, city, ai_lat=None, ai_lng=None):
+    if address and address.lower() not in ["none", "n/a", "unknown", "", "tbd"]:
+        try:
+            # Clean up the address for Nominatim
+            clean_address = address.split(" at ")[-1].strip()
+            search_query = f"{clean_address}, {city}"
+            encoded_query = urllib.parse.quote(search_query)
+            url = f"https://nominatim.openstreetmap.org/search?q={encoded_query}&format=json&limit=1"
+            
+            headers = {"User-Agent": "GarageSaleFinderGlobal/2.0"}
+            response = requests.get(url, headers=headers, timeout=10)
+            data = response.json()
+            time.sleep(1.2) # Be nice to OpenStreetMap servers
+            
+            if data:
+                lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
+                print(f"📍 Mapped (Nominatim): '{address}, {city}' -> {lat}, {lng}")
+                return lat, lng
+            else:
+                print(f"🗑️ Nominatim rejected '{address}'. Trying AI fallback...")
+        except Exception as e:
+            print(f"🚨 Geocoding error: {e}")
+            
+    # Fallback to AI estimated coordinates if Nominatim fails or no clean address
+    if ai_lat is not None and ai_lng is not None:
+        try:
+            lat, lng = float(ai_lat), float(ai_lng)
+            if lat != 0.0 and lng != 0.0:
+                print(f"📍 Mapped (AI Estimate): '{address}, {city}' -> {lat}, {lng}")
+                return lat, lng
+        except:
+            pass
+            
+    return None, None
 
 # ── SCRAPE KIJIJI (CANADA ONLY) ──
 def scrape_kijiji(city):
     url = f"https://www.kijiji.ca/b-garage-sale/{city}/k0l0"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.text, "html.parser")
-    except: return []
+    except Exception as e:
+        print(f"Kijiji scrape failed for {city}: {e}")
+        return []
 
     listings = []
-    cards = soup.find_all("li", {"class": lambda c: c and "regular-ad" in c})
-    for card in cards[:15]:
+    cards = soup.find_all("div", class_=lambda c: bool(c and "search-item" in c))
+    if not cards:
+         cards = soup.find_all("li", class_=lambda c: bool(c and "regular-ad" in c))
+         
+    for card in cards[:10]:
         try:
-            title = card.find("div", {"class": lambda c: c and "title" in c})
-            desc  = card.find("div", {"class": lambda c: c and "description" in c})
-            listing = {
-                "title": title.get_text(strip=True) if title else "",
-                "desc": desc.get_text(strip=True) if desc else ""
-            }
-            if listing["title"]: listings.append(listing)
+            title_elem = card.find("a", class_=lambda c: bool(c and "title" in c))
+            if not title_elem:
+                title_elem = card.find("a")
+            
+            title = title_elem.get_text(strip=True) if title_elem else ""
+            desc_elem = card.find("div", class_=lambda c: bool(c and "description" in c))
+            desc = desc_elem.get_text(strip=True) if desc_elem else ""
+            
+            link_val = title_elem.get("href") if title_elem else None
+            link = ""
+            if link_val:
+                link = str(link_val[0]) if isinstance(link_val, list) else str(link_val)
+                
+            if link:
+                if not link.startswith("http"):
+                    link = "https://www.kijiji.ca" + link
+                try:
+                    time.sleep(1) # Be nice to Kijiji to avoid bans
+                    ad_resp = requests.get(link, headers=headers, timeout=10)
+                    ad_soup = BeautifulSoup(ad_resp.text, "html.parser")
+                    full_desc_elem = ad_soup.find("div", {"itemprop": "description"}) or ad_soup.find("div", class_=lambda c: bool(c and "description" in c))
+                    if full_desc_elem:
+                        desc = full_desc_elem.get_text(" ", strip=True)
+                except:
+                    pass
+            
+            if title and ("garage" in title.lower() or "yard" in title.lower() or "moving" in title.lower() or "estate" in title.lower()):
+                listings.append({"title": title, "desc": desc})
         except: continue
     return listings
 
-# ── SCRAPE CRAIGSLIST (GLOBAL) ──
+# ── SCRAPE CRAIGSLIST (GLOBAL) USING RSS FOR FULL TEXT ──
 def scrape_craigslist(city):
-    url = f"https://{city}.craigslist.org/search/gss"
+    url = f"https://{city}.craigslist.org/search/gss?format=rss"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200: return [] 
-        soup = BeautifulSoup(response.text, "html.parser")
-    except: return []
+        soup = BeautifulSoup(response.content, "html.parser")
+    except Exception as e:
+        print(f"Craigslist scrape failed for {city}: {e}")
+        return []
 
     listings = []
-    cards = soup.find_all("li", {"class": "cl-static-search-result"})
-    for card in cards[:15]:
+    items = soup.find_all("item")
+    for item in items[:15]:
         try:
-            title = card.find("div", {"class": "title"})
-            listing = {
-                "title": title.get_text(strip=True) if title else "",
-                "desc": ""
-            }
-            if listing["title"]: listings.append(listing)
+            title = item.title.get_text(strip=True) if item.title else ""
+            desc = item.description.get_text(" ", strip=True) if item.description else ""
+            
+            if title and ("garage" in title.lower() or "yard" in title.lower() or "moving" in title.lower() or "estate" in title.lower()):
+                listings.append({
+                    "title": title,
+                    "desc": desc
+                })
         except: continue
     return listings
 
@@ -111,27 +146,30 @@ def scrape_craigslist(city):
 def extract_with_ai(listings, city):
     if not listings: return []
     prompt = f"""You are an elite data extraction and location parsing AI for {city}.
-Analyze the raw listings and extract structured data.
+Analyze the raw listings and extract structured data for Garage Sales, Yard Sales, Estate Sales, and Moving Sales.
 
-🔥 CRITICAL INSTRUCTION FOR 'street_address': 🔥
-Extract ONLY the number and street name, OR intersection, OR postal/zip code. 
-STRIP OUT all garbage words. DO NOT include the city name, state, or province.
-If absolutely no precise location data is in the text, return "".
+🔥 CRITICAL INSTRUCTIONS 🔥
+1. EXTRACT THE WHOLE DESCRIPTION. Do not summarize it. Provide the full details.
+2. Extract the EXACT date of the sale in YYYY-MM-DD format based on the text. If no specific date is found, use "2026-04-25".
+3. For 'street_address': Extract ONLY the house number and street name, OR intersection. STRIP OUT all garbage words (like "sale at", "corner of"). DO NOT include the city name, state, or province. Make it highly suitable for exact OpenStreetMap geocoding. If absolutely no location is found, return "".
+4. Estimate the exact precise 'lat' and 'lng' for this location in {city}. Provide them as numbers. If you cannot estimate, use null.
 
 Return a JSON array of objects with these exact keys:
 - title: string
 - description: string
-- date: MUST be YYYY-MM-DD. If missing, use "2026-04-25"
-- street_address: highly clean string for geocoding"""
+- date: string (YYYY-MM-DD)
+- street_address: string
+- lat: number or null
+- lng: number or null
+"""
     
     try:
-        # 🔥 THE FIX: Force JSON mime type so Gemini CANNOT format it incorrectly
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt + "\nRaw Data:\n" + json.dumps(listings),
             config={"response_mime_type": "application/json"}
         )
-        return json.loads(response.text)
+        return json.loads(response.text or "[]")
     except Exception as e:
         print(f"🚨 AI error in {city}: {e}")
         return []
@@ -194,7 +232,12 @@ def run_scraper_background():
         if raw:
             structured = extract_with_ai(raw, city.capitalize())
             for sale in structured:
-                lat, lng = geocode_location(sale.get("street_address", ""), city)
+                lat, lng = geocode_location(
+                    sale.get("street_address", ""), 
+                    city, 
+                    sale.get("lat"), 
+                    sale.get("lng")
+                )
                 if lat is not None and lng is not None:
                     sale["lat"], sale["lng"] = lat, lng
                     valid_sales.append(sale)
